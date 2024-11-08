@@ -14,12 +14,12 @@ contract DecimalOffsetERC4626 is ERC4626 {
     constructor(ERC20 _asset) {
         name_ = "MockERC4626";
         symbol_ = "DOH";
-        decimals_ = _asset.decimals();
+        decimals_ = _asset.decimals(); // YOU CAN ADD DECIMALS HERE, AND IT STILL WORKS
         asset_ = address(_asset);
     }
 
     function _decimalsOffset() internal pure override returns (uint8) {
-        return 6;
+        return 6; // TRY 0 TO MAKE IT GO AWAY
     }
 
     function decimalsOffset() public pure returns (uint8) {
