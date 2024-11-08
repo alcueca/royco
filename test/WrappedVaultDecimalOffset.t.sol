@@ -27,9 +27,11 @@ contract WrappedVaultDecimalOffsetTest is Test {
 
     ERC20 token1 = ERC20(address(new MockERC20("Mock Token", "MOCK", 18)));
     ERC20 token2 = ERC20(address(new MockERC20("Mock Token", "MOCK", 6)));
-    ERC20 token = token2;
+    ERC20 token3 = ERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    ERC20 token = token3;
     DecimalOffsetERC4626 testVault1 = DecimalOffsetERC4626(address(new MockERC4626(token)));
     DecimalOffsetERC4626 testVault2 = DecimalOffsetERC4626(address(new DecimalOffsetERC4626(token)));
+    DecimalOffsetERC4626 testVault3 = DecimalOffsetERC4626(0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB);
     DecimalOffsetERC4626 testVault;
     WrappedVault testIncentivizedVault;
 
@@ -60,11 +62,10 @@ contract WrappedVaultDecimalOffsetTest is Test {
 
     function setUp() public {
         rewardToken = rewardToken1;
-        testVault = testVault2;
+        testVault = testVault3;
 
         testFactory = new WrappedVaultFactory(DEFAULT_FEE_RECIPIENT, DEFAULT_PROTOCOL_FEE, DEFAULT_FRONTEND_FEE, address(this), address(pointsFactory));
         testIncentivizedVault = testFactory.wrapVault(testVault, address(this), "Incentivized Vault", DEFAULT_FRONTEND_FEE);
-
 
         vm.label(address(testIncentivizedVault), "IncentivizedVault");
         vm.label(address(rewardToken1), "RewardToken1");
@@ -74,7 +75,63 @@ contract WrappedVaultDecimalOffsetTest is Test {
     }
 
 
-    function testClaim_Debug() public {
+    function testClaimMainnet_Debug() public {
+        // Breaking scenario
+        // Deposit 627129793404660265672081267
+        // Elapsed 2320009
+
+        uint256 depositAmount = 1_000 * 10 ** token.decimals();
+        uint32 timeElapsed = 15 days;
+
+        // vm.assume(depositAmount > 1e6);
+        // vm.assume(depositAmount <= type(uint96).max);
+        // vm.assume(timeElapsed > 1e6);
+        // vm.assume(timeElapsed <= 30 days);
+
+        uint256 rewardAmount = 1_000 * 10 ** rewardToken.decimals();
+        uint32 start = uint32(block.timestamp);
+        uint32 duration = 30 days;
+
+        testIncentivizedVault.addRewardsToken(address(rewardToken));
+        rewardToken.mint(address(this), rewardAmount);
+        rewardToken.approve(address(testIncentivizedVault), rewardAmount);
+        testIncentivizedVault.setRewardsInterval(address(rewardToken), start, start + duration, rewardAmount, DEFAULT_FEE_RECIPIENT);
+
+        uint256 frontendFee = rewardAmount.mulWadDown(testIncentivizedVault.frontendFee());
+        uint256 protocolFee = rewardAmount.mulWadDown(testFactory.protocolFee());
+
+        rewardAmount -= frontendFee + protocolFee;
+
+        vm.prank(0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341);
+        MockERC20(address(token)).transfer(REGULAR_USER, depositAmount);
+
+        vm.startPrank(REGULAR_USER);
+        token.approve(address(testIncentivizedVault), depositAmount);
+        uint256 shares = testIncentivizedVault.deposit(depositAmount, REGULAR_USER);
+        vm.warp(block.timestamp + timeElapsed);
+
+        uint256 expectedRewards = (rewardAmount / duration) * shares / testIncentivizedVault.totalSupply() * timeElapsed;
+        testIncentivizedVault.rewardToInterval(address(rewardToken));
+
+        testIncentivizedVault.claim(REGULAR_USER);
+        vm.stopPrank();
+
+        console.log("Rewards %s", displayDecimals(rewardAmount, rewardToken.decimals()));
+        console.log("Received %s", displayDecimals(rewardToken.balanceOf(REGULAR_USER), rewardToken.decimals()));
+        console.log("Expected %s", displayDecimals(expectedRewards, rewardToken.decimals()));
+        console.log("Deposit %s", displayDecimals(depositAmount, token.decimals()));
+        console.log("Duration %s", duration);
+        console.log("Elapsed %s", timeElapsed);
+        console.log("Asset decimals %s", token.decimals());
+        console.log("Vault decimals %s", testVault.decimals());
+        // console.log("Decimals offset %s", testVault.decimalsOffset());
+        console.log("Reward decimals %s", rewardToken.decimals());
+
+
+        assertApproxEqRel(rewardToken.balanceOf(REGULAR_USER), expectedRewards, 2e15); // Allow 0.2% deviation
+    }
+
+    function testClaimLocal() public {
         // Breaking scenario
         // Deposit 627129793404660265672081267
         // Elapsed 2320009
@@ -106,7 +163,7 @@ contract WrappedVaultDecimalOffsetTest is Test {
         vm.startPrank(REGULAR_USER);
         token.approve(address(testIncentivizedVault), depositAmount);
         uint256 shares = testIncentivizedVault.deposit(depositAmount, REGULAR_USER);
-        vm.warp(timeElapsed);
+        vm.warp(block.timestamp + timeElapsed);
 
         uint256 expectedRewards = (rewardAmount / duration) * shares / testIncentivizedVault.totalSupply() * timeElapsed;
         testIncentivizedVault.rewardToInterval(address(rewardToken));
