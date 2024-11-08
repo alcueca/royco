@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { ERC20 } from "../lib/solmate/src/tokens/ERC20.sol";
-import { ERC4626 } from "../lib/solmate/src/tokens/ERC4626.sol";
+import { ERC20 } from "../lib/solady/src/tokens/ERC20.sol";
+import { ERC4626 } from "../lib/solady/src/tokens/ERC4626.sol";
 import { WrappedVault } from "src/WrappedVault.sol";
-import { SafeTransferLib } from "lib/solmate/src/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 import { Ownable2Step, Ownable } from "lib/openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import { ReentrancyGuardTransient } from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuardTransient.sol";
 
@@ -12,7 +12,7 @@ import { ReentrancyGuardTransient } from "lib/openzeppelin-contracts/contracts/u
 /// @author Jack Corddry, CopyPaste, Shivaansh Kapoor
 /// @notice VaultMarketHub contract for Incentivizing AP/IPs to participate incentivized ERC4626 markets
 contract VaultMarketHub is Ownable2Step, ReentrancyGuardTransient {
-    using SafeTransferLib for ERC20;
+    using SafeTransferLib for address;
 
     /// @custom:field offerID Set to numOffers - 1 on offer creation (zero-indexed)
     /// @custom:field targetVault The address of the vault where the input tokens will be deposited
@@ -207,7 +207,7 @@ contract VaultMarketHub is Ownable2Step, ReentrancyGuardTransient {
         // if the fundingVault is set to 0, fund the fill directly via the base asset
         if (offer.fundingVault == address(0)) {
             // Transfer the base asset from the AP to the VaultMarketHub
-            targetAsset.safeTransferFrom(offer.ap, address(this), fillAmount);
+            address(targetAsset).safeTransferFrom(offer.ap, address(this), fillAmount);
         } else {
             // Get pre-withdraw token balance of VaultMarketHub
             uint256 preWithdrawTokenBalance = targetAsset.balanceOf(address(this));
@@ -234,8 +234,7 @@ contract VaultMarketHub is Ownable2Step, ReentrancyGuardTransient {
             }
         }
 
-        targetAsset.safeApprove(offer.targetVault, 0);
-        targetAsset.safeApprove(offer.targetVault, fillAmount);
+        targetAsset.approve(offer.targetVault, fillAmount);
 
         // Deposit into the target vault
         ERC4626(offer.targetVault).deposit(fillAmount, offer.ap);

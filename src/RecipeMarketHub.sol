@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import { RecipeMarketHubBase, RewardStyle, WeirollWallet } from "src/base/RecipeMarketHubBase.sol";
-import { ERC20 } from "lib/solmate/src/tokens/ERC20.sol";
-import { ERC4626 } from "lib/solmate/src/tokens/ERC4626.sol";
+import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
+import { ERC4626 } from "lib/solady/src/tokens/ERC4626.sol";
 import { ClonesWithImmutableArgs } from "lib/clones-with-immutable-args/src/ClonesWithImmutableArgs.sol";
-import { SafeTransferLib } from "lib/solmate/src/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 import { FixedPointMathLib } from "lib/solmate/src/utils/FixedPointMathLib.sol";
 import { Points } from "src/Points.sol";
 import { PointsFactory } from "src/PointsFactory.sol";
@@ -16,7 +16,7 @@ import { Owned } from "lib/solmate/src/auth/Owned.sol";
 /// @notice RecipeMarketHub contract for Incentivizing AP/IPs to participate in "recipe" markets which perform arbitrary actions
 contract RecipeMarketHub is RecipeMarketHubBase {
     using ClonesWithImmutableArgs for address;
-    using SafeTransferLib for ERC20;
+    using SafeTransferLib for address;
     using FixedPointMathLib for uint256;
 
     /// @param _weirollWalletImplementation The address of the WeirollWallet implementation contract
@@ -133,7 +133,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
         }
 
         // NOTE: The cool use of short-circuit means this call can't revert if fundingVault doesn't support asset()
-        if (fundingVault != address(0) && targetMarket.inputToken != ERC4626(fundingVault).asset()) {
+        if (fundingVault != address(0) && address(targetMarket.inputToken) != ERC4626(fundingVault).asset()) {
             revert MismatchedBaseAsset();
         }
 
@@ -242,7 +242,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
                 // frontrunning
                 if (incentive.code.length == 0) revert TokenDoesNotExist();
                 // Transfer frontend fee + protocol fee + incentiveAmount of the incentive to RecipeMarketHub
-                ERC20(incentive).safeTransferFrom(msg.sender, address(this), incentiveAmount + protocolFeeAmount + frontendFeeAmount);
+                incentive.safeTransferFrom(msg.sender, address(this), incentiveAmount + protocolFeeAmount + frontendFeeAmount);
             }
         }
 
@@ -281,7 +281,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
     function claimFees(address incentiveToken, address to) external payable {
         uint256 amount = feeClaimantToTokenToAmount[msg.sender][incentiveToken];
         delete feeClaimantToTokenToAmount[msg.sender][incentiveToken];
-        ERC20(incentiveToken).safeTransfer(to, amount);
+        incentiveToken.safeTransfer(to, amount);
         emit FeesClaimed(msg.sender, incentiveToken, amount);
     }
 
@@ -333,7 +333,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
             fillAmount = offer.remainingQuantity;
         }
         // Check that the offer's base asset matches the market's base asset
-        if (fundingVault != address(0) && market.inputToken != ERC4626(fundingVault).asset()) {
+        if (fundingVault != address(0) && address(market.inputToken) != ERC4626(fundingVault).asset()) {
             revert MismatchedBaseAsset();
         }
         // Check that the offer isn't empty
@@ -581,7 +581,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
                 uint256 unchargedProtocolFeeAmount = offer.incentiveToProtocolFeeAmount[incentive].mulWadDown(percentNotFilled);
 
                 // Transfer reimbursements to the IP
-                ERC20(incentive).safeTransfer(offer.ip, (incentivesRemaining + unchargedFrontendFeeAmount + unchargedProtocolFeeAmount));
+                incentive.safeTransfer(offer.ip, (incentivesRemaining + unchargedFrontendFeeAmount + unchargedProtocolFeeAmount));
             }
 
             /// Delete cancelled fields of dynamic arrays and mappings
@@ -662,7 +662,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
                         // Calculate frontend fee to refund to the IP on forfeit
                         uint256 frontendFeeAmount = offer.incentiveToFrontendFeeAmount[incentive].mulWadDown(fillPercentage);
                         // Refund incentive tokens and frontend fee to IP. Points don't need to be refunded.
-                        ERC20(incentive).safeTransfer(ip, params.amounts[i] + frontendFeeAmount);
+                        incentive.safeTransfer(ip, params.amounts[i] + frontendFeeAmount);
                     }
 
                     // Delete forfeited incentives and corresponding amounts from locked reward params
@@ -707,7 +707,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
                     // Calculate frontend fee to refund to the IP on forfeit
                     uint256 frontendFeeAmount = amount.mulWadDown(marketFrontendFee);
                     // Refund incentive tokens and frontend fee to IP. Points don't need to be refunded.
-                    ERC20(incentive).safeTransfer(ip, amount + frontendFeeAmount);
+                    incentive.safeTransfer(ip, amount + frontendFeeAmount);
                 }
 
                 // Delete forfeited incentives and corresponding amounts from locked reward params
@@ -900,7 +900,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
     function _fundWeirollWallet(address fundingVault, address ap, ERC20 token, uint256 amount, address weirollWallet) internal {
         if (fundingVault == address(0)) {
             // If no fundingVault specified, fund the wallet directly from AP
-            token.safeTransferFrom(ap, weirollWallet, amount);
+            address(token).safeTransferFrom(ap, weirollWallet, amount);
         } else {
             // Withdraw the tokens from the funding vault into the wallet
             ERC4626(fundingVault).withdraw(amount, weirollWallet, ap);
@@ -941,7 +941,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
         if (PointsFactory(POINTS_FACTORY).isPointsProgram(incentive)) {
             Points(incentive).award(to, incentiveAmount, ip);
         } else {
-            ERC20(incentive).safeTransfer(to, incentiveAmount);
+            incentive.safeTransfer(to, incentiveAmount);
         }
     }
 
@@ -984,9 +984,9 @@ contract RecipeMarketHub is RecipeMarketHubBase {
                     revert TokenDoesNotExist();
                 }
                 // Transfer protcol and frontend fees to RecipeMarketHub for the claimants to withdraw them on-demand
-                ERC20(incentive).safeTransferFrom(msg.sender, address(this), protocolFeeAmount + frontendFeeAmount);
+                incentive.safeTransferFrom(msg.sender, address(this), protocolFeeAmount + frontendFeeAmount);
                 // Transfer AP's incentives to them on fill if token
-                ERC20(incentive).safeTransferFrom(msg.sender, ap, incentiveAmount);
+                incentive.safeTransferFrom(msg.sender, ap, incentiveAmount);
             }
         } else {
             // RewardStyle is Forfeitable or Arrear
@@ -1007,7 +1007,7 @@ contract RecipeMarketHub is RecipeMarketHubBase {
                 }
                 // If not a points program, transfer amount requested (based on fill percentage) to the RecipeMarketHub in addition to protocol and frontend
                 // fees.
-                ERC20(incentive).safeTransferFrom(msg.sender, address(this), incentiveAmount + protocolFeeAmount + frontendFeeAmount);
+                incentive.safeTransferFrom(msg.sender, address(this), incentiveAmount + protocolFeeAmount + frontendFeeAmount);
             }
         }
     }

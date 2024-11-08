@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { ERC20 } from "lib/solmate/src/tokens/ERC20.sol";
+import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
 import { SafeCast } from "src/libraries/SafeCast.sol";
-import { SafeTransferLib } from "lib/solmate/src/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 import { Owned } from "lib/solmate/src/auth/Owned.sol";
 import { Points } from "src/Points.sol";
 import { PointsFactory } from "src/PointsFactory.sol";
@@ -17,7 +17,7 @@ import { WrappedVaultFactory } from "src/WrappedVaultFactory.sol";
 /// The rewarded amount will be a fixed wei per second, distributed proportionally to token holders
 /// by the size of their holdings.
 contract WrappedVault is Owned, ERC20, IWrappedVault {
-    using SafeTransferLib for ERC20;
+    using SafeTransferLib for address;
     using SafeCast for uint256;
     using FixedPointMathLib for uint256;
 
@@ -108,6 +108,10 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
     /// @dev Maps a reward (either token or points) to a claimant, to accrued fees
     mapping(address => mapping(address => uint256)) public rewardToClaimantToFees;
 
+    string internal name_;
+    string internal symbol_;
+    uint8 internal decimals_;
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -127,8 +131,11 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         address pointsFactory
     )
         Owned(_owner)
-        ERC20(_name, _symbol, ERC20(vault).decimals())
     {
+        name_ = _name;
+        symbol_ = _symbol;
+        decimals_ = ERC20(vault).decimals();
+
         ERC4626I_FACTORY = WrappedVaultFactory(msg.sender);
         if (initialFrontendFee < ERC4626I_FACTORY.minimumFrontendFee()) revert FrontendFeeBelowMinimum();
 
@@ -140,6 +147,18 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         _mint(address(0), 10_000); // Burn 10,000 wei to stop 'first share' front running attacks on depositors
 
         DEPOSIT_ASSET.approve(vault, type(uint256).max);
+    }
+
+    function name() public view override returns (string memory) {
+        return name_;
+    }
+
+    function symbol() public view override returns (string memory) {
+        return symbol_;
+    }
+
+    function decimals() public view override returns (uint8) {
+        return decimals_;
     }
 
     /// @param rewardsToken The new reward token / points program to be used as incentives
@@ -196,7 +215,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         if (POINTS_FACTORY.isPointsProgram(reward)) {
             if (!Points(reward).isAllowedVault(address(this))) revert VaultNotAuthorizedToRewardPoints();
         } else {
-            ERC20(reward).safeTransferFrom(from, address(this), amount);
+            reward.safeTransferFrom(from, address(this), amount);
         }
     }
 
@@ -211,7 +230,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         if (POINTS_FACTORY.isPointsProgram(reward)) {
             Points(reward).award(to, amount);
         } else {
-            ERC20(reward).safeTransfer(to, amount);
+            reward.safeTransfer(to, amount);
         }
     }
 
@@ -317,7 +336,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
 
         uint256 rewardsOwed = (rewardsInterval.rate * (rewardsInterval.end - rewardsInterval.start)) - 1; // Round down
         if (!POINTS_FACTORY.isPointsProgram(reward)) {
-            ERC20(reward).safeTransfer(msg.sender, rewardsOwed);
+            reward.safeTransfer(msg.sender, rewardsOwed);
         }
         emit RewardsSet(reward, 0, 0, 0, 0, 0, 0);
     }
@@ -351,7 +370,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
 
         uint256 elapsedWAD = elapsed * 1e18;
         // Calculate and update the new value of the accumulator.
-        rewardsPerTokenOut.accumulated = (rewardsPerTokenIn.accumulated + (elapsedWAD.mulDivDown(rewardsInterval_.rate, totalSupply))); // The
+        rewardsPerTokenOut.accumulated = (rewardsPerTokenIn.accumulated + (elapsedWAD.mulDivDown(rewardsInterval_.rate, totalSupply()))); // The
             // rewards per token are scaled up for precision
 
         return rewardsPerTokenOut;
@@ -397,7 +416,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         if (userRewards_.checkpoint == rewardsPerToken_.accumulated) return userRewards_;
 
         // Calculate and update the new value user reserves.
-        userRewards_.accumulated += _calculateUserRewards(balanceOf[user], userRewards_.checkpoint, rewardsPerToken_.accumulated).toUint128();
+        userRewards_.accumulated += _calculateUserRewards(balanceOf(user), userRewards_.checkpoint, rewardsPerToken_.accumulated).toUint128();
         userRewards_.checkpoint = rewardsPerToken_.accumulated;
 
         rewardToUserToAR[reward][user] = userRewards_;
@@ -473,7 +492,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
     function currentUserRewards(address reward, address user) public view returns (uint256) {
         UserRewards memory accumulatedRewards_ = rewardToUserToAR[reward][user];
         RewardsPerToken memory rewardsPerToken_ = _calculateRewardsPerToken(rewardToRPT[reward], rewardToInterval[reward]);
-        return accumulatedRewards_.accumulated + _calculateUserRewards(balanceOf[user], accumulatedRewards_.checkpoint, rewardsPerToken_.accumulated);
+        return accumulatedRewards_.accumulated + _calculateUserRewards(balanceOf(user), accumulatedRewards_.checkpoint, rewardsPerToken_.accumulated);
     }
 
     /// @notice Calculates the rate a user would receive in rewards after depositing assets
@@ -483,7 +502,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         if (rewardsInterval.start > block.timestamp || block.timestamp >= rewardsInterval.end) return 0;
         uint256 shares = VAULT.previewDeposit(assets);
 
-        return (uint256(rewardsInterval.rate) * shares / (totalSupply + shares)) * 1e18 / assets;
+        return (uint256(rewardsInterval.rate) * shares / (totalSupply()+ shares)) * 1e18 / assets;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -506,7 +525,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
     /// @param receiver The address to mint the shares to
     /// @param minShares The minimum amount of shares to mint
     function safeDeposit(uint256 assets, address receiver, uint256 minShares) public returns (uint256 shares) {
-        DEPOSIT_ASSET.safeTransferFrom(msg.sender, address(this), assets);
+        address(DEPOSIT_ASSET).safeTransferFrom(msg.sender, address(this), assets);
 
         shares = VAULT.deposit(assets, address(this));
         if (shares < minShares) revert TooFewShares();
@@ -517,7 +536,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
 
     /// @inheritdoc IWrappedVault
     function deposit(uint256 assets, address receiver) public returns (uint256 shares) {
-        DEPOSIT_ASSET.safeTransferFrom(msg.sender, address(this), assets);
+        address(DEPOSIT_ASSET).safeTransferFrom(msg.sender, address(this), assets);
 
         shares = VAULT.deposit(assets, address(this));
         _mint(receiver, shares);
@@ -527,7 +546,7 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
 
     /// @inheritdoc IWrappedVault
     function mint(uint256 shares, address receiver) public returns (uint256 assets) {
-        DEPOSIT_ASSET.safeTransferFrom(msg.sender, address(this), VAULT.previewMint(shares));
+        address(DEPOSIT_ASSET).safeTransferFrom(msg.sender, address(this), VAULT.previewMint(shares));
 
         assets = VAULT.mint(shares, address(this));
         _mint(receiver, shares);
@@ -540,9 +559,9 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
         uint256 expectedShares = VAULT.previewWithdraw(assets);
         // Check the caller is the token owner or has been approved by the owner
         if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender];
+            uint256 allowed = allowance(owner, msg.sender);
             if (expectedShares > allowed) revert NotOwnerOfVaultOrApproved();
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - expectedShares;
+            if (allowed != type(uint256).max) _spendAllowance(owner, msg.sender, expectedShares);
         }
 
         _burn(owner, expectedShares);
@@ -558,9 +577,9 @@ contract WrappedVault is Owned, ERC20, IWrappedVault {
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets) {
         // Check the caller is the token owner or has been approved by the owner
         if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender];
+            uint256 allowed = allowance(owner, msg.sender);
             if (shares > allowed) revert NotOwnerOfVaultOrApproved();
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
+            if (allowed != type(uint256).max) _spendAllowance(owner, msg.sender, shares);
         }
 
         _burn(owner, shares);
