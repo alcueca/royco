@@ -48,8 +48,8 @@ contract ScenarioTest is Test {
     RecipeMarketHub.Recipe NULL_RECIPE = RecipeMarketHubBase.Recipe(new bytes32[](0), new bytes[](0));
 
     function setUp() public {
-        baseToken = new MockERC20("Base Token", "BT");
-        baseToken2 = new MockERC20("Base Token2", "BT2");
+        baseToken = new MockERC20("Base Token", "BT", 18);
+        baseToken2 = new MockERC20("Base Token2", "BT2", 18);
 
         targetVault = new MockERC4626(baseToken);
         targetVault2 = new MockERC4626(baseToken);

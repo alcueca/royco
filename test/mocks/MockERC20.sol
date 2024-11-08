@@ -21,10 +21,10 @@ contract MockERC20 is ERC20 {
         return decimals_;
     }
 
-    constructor(string memory _name, string memory _symbol) {
+    constructor(string memory _name, string memory _symbol, uint8 _decimals) {
         name_ = _name;
         symbol_ = _symbol;
-        decimals_ = 18;
+        decimals_ = _decimals;
     }
 
     function mint(address to, uint256 amount) public {

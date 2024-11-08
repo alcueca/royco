@@ -123,7 +123,7 @@ contract TestFuzz_APOfferCreation_RecipeMarketHub is RecipeMarketHubTestBase {
         uint256[] memory tokenAmountsRequested = new uint256[](1);
         tokenAmountsRequested[0] = 1000e18;
 
-        MockERC4626 mismatchedTokenVault = new MockERC4626(new MockERC20(_tokenName, _tokenSymbol));
+        MockERC4626 mismatchedTokenVault = new MockERC4626(new MockERC20(_tokenName, _tokenSymbol, 18));
 
         vm.expectRevert(abi.encodeWithSelector(RecipeMarketHubBase.MismatchedBaseAsset.selector));
         recipeMarketHub.createAPOffer(

@@ -13,7 +13,7 @@ import { WrappedVaultFactory } from "src/WrappedVaultFactory.sol";
 import { Test } from "forge-std/Test.sol";
 
 contract ERC20Test is Test {
-    ERC20 underlyingToken = ERC20(address(new MockERC20("Mock Token", "MOCK")));
+    ERC20 underlyingToken = ERC20(address(new MockERC20("Mock Token", "MOCK", 18)));
     ERC4626 testVault = ERC4626(address(new MockERC4626(underlyingToken)));
     WrappedVault token;
 

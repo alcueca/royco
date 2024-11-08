@@ -31,7 +31,7 @@ contract TestFuzz_IPOfferCreation_RecipeMarketHub is RecipeMarketHubTestBase {
             address tokenAddress = address(uint160(uint256(keccak256(abi.encodePacked(marketHash, i)))));
 
             // Inject mock ERC20 bytecode into the token addresses
-            MockERC20 mockToken = new MockERC20("Mock Token", "MKT");
+            MockERC20 mockToken = new MockERC20("Mock Token", "MKT", 18);
             vm.etch(tokenAddress, address(mockToken).code);
 
             incentivesOffered[i] = tokenAddress;
@@ -235,7 +235,7 @@ contract TestFuzz_IPOfferCreation_RecipeMarketHub is RecipeMarketHubTestBase {
             // Inject mock ERC20 bytecode into the token addresses
             string memory name = string(abi.encodePacked("Mock_", i));
             string memory symbol = string(abi.encodePacked("MCK_", i));
-            MockERC20 mockToken = new MockERC20(name, symbol);
+            MockERC20 mockToken = new MockERC20(name, symbol, 18);
             vm.etch(tokenAddress, address(mockToken).code);
 
             incentivesOffered[i] = tokenAddress;

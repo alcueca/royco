@@ -90,8 +90,8 @@ contract RoycoTestBase is Test {
 
     function setUpRoycoContracts() internal {
         weirollImplementation = new WeirollWallet();
-        mockLiquidityToken = new MockERC20("Mock Liquidity Token", "MLT");
-        mockIncentiveToken = new MockERC20("Mock Incentive Token", "MIT");
+        mockLiquidityToken = new MockERC20("Mock Liquidity Token", "MLT", 18);
+        mockIncentiveToken = new MockERC20("Mock Incentive Token", "MIT", 18);
         mockVault = new MockERC4626(mockLiquidityToken);
         pointsFactory = new PointsFactory(POINTS_FACTORY_OWNER_ADDRESS);
         erc4626iFactory = new WrappedVaultFactory(OWNER_ADDRESS, ERC4626I_FACTORY_PROTOCOL_FEE, ERC4626I_FACTORY_MIN_FRONTEND_FEE, OWNER_ADDRESS, address(pointsFactory));

@@ -19,3 +19,6 @@
 [submodule "lib/enso-weiroll"]
 	path = lib/enso-weiroll
 	url = https://github.com/EnsoFinance/enso-weiroll
+[submodule "lib/solidity-stringutils"]
+	path = lib/solidity-stringutils
+	url = https://github.com/arachnid/solidity-stringutils
