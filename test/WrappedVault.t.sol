@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockERC4626 } from "test/mocks/MockERC4626.sol";
+import { DecimalOffsetERC4626 } from "test/mocks/DecimalOffsetERC4626.sol";
 
 import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
 import { ERC4626 } from "lib/solady/src/tokens/ERC4626.sol";
@@ -21,7 +21,7 @@ contract WrappedVaultTest is Test {
     using FixedPointMathLib for *;
 
     ERC20 token = ERC20(address(new MockERC20("Mock Token", "MOCK")));
-    ERC4626 testVault = ERC4626(address(new MockERC4626(token)));
+    ERC4626 testVault = ERC4626(address(new DecimalOffsetERC4626(token)));
     WrappedVault testIncentivizedVault;
 
     PointsFactory pointsFactory = new PointsFactory(POINTS_FACTORY_OWNER);
