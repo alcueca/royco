@@ -20,7 +20,7 @@ import { Test, console } from "forge-std/Test.sol";
 contract WrappedVaultTest is Test {
     using FixedPointMathLib for *;
 
-    ERC20 token = ERC20(address(new MockERC20("Mock Token", "MOCK")));
+    ERC20 token = ERC20(address(new MockERC20("Mock Token", "MOCK", 18)));
     ERC4626 testVault = ERC4626(address(new DecimalOffsetERC4626(token)));
     WrappedVault testIncentivizedVault;
 
@@ -45,8 +45,8 @@ contract WrappedVaultTest is Test {
         testFactory = new WrappedVaultFactory(DEFAULT_FEE_RECIPIENT, DEFAULT_PROTOCOL_FEE, DEFAULT_FRONTEND_FEE, address(this), address(pointsFactory));
         testIncentivizedVault = testFactory.wrapVault(testVault, address(this), "Incentivized Vault", DEFAULT_FRONTEND_FEE);
 
-        rewardToken1 = new MockERC20("Reward Token 1", "RWD1");
-        rewardToken2 = new MockERC20("Reward Token 2", "RWD2");
+        rewardToken1 = new MockERC20("Reward Token 1", "RWD1", 18);
+        rewardToken2 = new MockERC20("Reward Token 2", "RWD2", 18);
 
         vm.label(address(testIncentivizedVault), "IncentivizedVault");
         vm.label(address(rewardToken1), "RewardToken1");
@@ -127,10 +127,10 @@ contract WrappedVaultTest is Test {
 
     function testAddRewardTokenMaxReached() public {
         for (uint256 i = 0; i < testIncentivizedVault.MAX_REWARDS(); i++) {
-            testIncentivizedVault.addRewardsToken(address(new MockERC20("", "")));
+            testIncentivizedVault.addRewardsToken(address(new MockERC20("", "", 18)));
         }
 
-        address mockToken = address(new MockERC20("", ""));
+        address mockToken = address(new MockERC20("", "", 18));
         vm.expectRevert(WrappedVault.MaxRewardsReached.selector);
         testIncentivizedVault.addRewardsToken(mockToken);
     }
